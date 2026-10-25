@@ -40,6 +40,9 @@ jobs:
       CHAT_PREFIX: ${{ inputs.chat_prefix || 'qwen2.5-7b-instruct-q4_k_m' }}
       BACKENDS: ${{ inputs.backends || 'cpu,vulkan' }}
       PUBLISH_RELEASE: ${{ inputs.publish_release == true && '1' || '' }}
+      # Windows runners default to cp1252; make every Python process UTF-8 safe
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
 
     steps:
       - uses: actions/checkout@v4

@@ -2,7 +2,7 @@
 """Fetch build-time assets for the portable GBV Monitor bundle.
 
 Downloads (into --DEST, default: the repo root):
-    runtime/<backend>/…   llama.cpp llama-server Windows binaries
+    runtime/<backend>/   llama.cpp llama-server Windows binaries
     models/*.gguf         chat model (default Qwen2.5-7B-Instruct Q4_K_M,
                           sharded) + nomic-embed-text-v1.5 Q8_0
 
@@ -78,7 +78,7 @@ def resolve_asset(session: requests.Session, backend: str) -> tuple[str, str]:
             name = asset.get("name", "")
             if rx.match(name):
                 tag = rel.get("tag_name", "")
-                print(f"[assets] {backend}: {tag} → {name}")
+                print(f"[assets] {backend}: {tag} -> {name}")
                 return tag, asset["browser_download_url"]
     raise SystemExit(
         f"No llama.cpp release asset matched '{pat}'. Check {GH_API} "
@@ -91,19 +91,19 @@ def fetch_engine(dest: Path, backends: list[str]) -> None:
     for backend in backends:
         target = dest / "runtime" / backend
         if any(target.glob("**/llama-server*")):
-            print(f"[assets] {backend} engine already present → skip")
+            print(f"[assets] {backend} engine already present -> skip")
             continue
         _, url = resolve_asset(session, backend)
         tmpdir = Path(tempfile.mkdtemp(prefix="llamacpp_"))
         try:
-            print(f"[assets] downloading {url} …")
+            print(f"[assets] downloading {url} ...")
             zip_path = tmpdir / "engine.zip"
             with session.get(url, stream=True, timeout=600) as r:
                 r.raise_for_status()
                 with open(zip_path, "wb") as f:
                     shutil.copyfileobj(r.raw, f)
             target.mkdir(parents=True, exist_ok=True)
-            print(f"[assets] extracting → {target}")
+            print(f"[assets] extracting -> {target}")
             with zipfile.ZipFile(zip_path) as z:
                 z.extractall(target)
         finally:
@@ -144,15 +144,20 @@ def fetch_models(dest: Path, chat_repo: str, chat_prefix: str,
 
 def download_one(models_dir: Path, repo: str, filename: str) -> None:
     if (models_dir / filename).is_file():
-        print(f"[assets] {filename} already present → skip")
+        print(f"[assets] {filename} already present -> skip")
         return
-    print(f"[assets] downloading  {repo}/{filename} …")
+    print(f"[assets] downloading  {repo}/{filename} ...")
     hf_hub_download(repo_id=repo, repo_type="model", filename=filename, local_dir=str(models_dir))
     if not (models_dir / filename).is_file():
         raise SystemExit(f"Download finished but {filename} is missing in {models_dir}")
 
 
 def main() -> int:
+    try:  # Windows runners default to cp1252 — keep all console I/O decodable
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--dest", default=".", help="where to create runtime/ and models/")
     ap.add_argument("--backends", default="cpu",
@@ -174,7 +179,7 @@ def main() -> int:
     backends = [b.strip() for b in args.backends.split(",") if b.strip()]
     if "win" not in sys.platform.lower():
         print("[assets] NOTE: llama-server Windows binaries are downloaded for the "
-              "portable build — they only *run* on Windows;")
+              "portable build -- they only *run* on Windows;")
     fetch_engine(dest, backends)
 
     if not args.skip_models:
